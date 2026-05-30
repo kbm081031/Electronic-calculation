@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOH 무대 전력 인프라 최적화 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0e14;
+  --bg2: #111520;
+  --bg3: #181d2b;
+  --bg4: #1e2436;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #e2e8f0;
+  --text2: #8892a4;
+  --text3: #5a6478;
+  --accent: #3b82f6;
+  --accent2: #60a5fa;
+  --green: #10b981;
+  --green2: #34d399;
+  --red: #ef4444;
+  --red2: #f87171;
+  --amber: #f59e0b;
+  --amber2: #fbbf24;
+  --purple: #8b5cf6;
+  --cyan: #06b6d4;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* GRID BACKGROUND */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: 24px; }
+
+/* HEADER */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 0 24px;
+  border-bottom: 1px solid var(--border2);
+  margin-bottom: 24px;
+}
+.header-left { display: flex; align-items: center; gap: 14px; }
+.logo-box {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.header-title h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+.header-title p { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-top: 1px; }
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px;
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.25);
+  border-radius: 100px;
+  font-size: 11px; font-family: var(--mono);
+  color: var(--green2);
+}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green2); animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* VENUE SELECTOR */
+.venue-section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.section-label {
+  font-size: 10px; font-family: var(--mono);
+  color: var(--text3); letter-spacing: 1.5px;
+  text-transform: uppercase; margin-bottom: 14px;
+}
+.venue-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.venue-tab {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text2);
+  font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all .2s;
+}
+.venue-tab:hover { border-color: var(--accent); color: var(--accent2); }
+.venue-tab.active {
+  background: var(--accent); border-color: var(--accent);
+  color: #fff; font-weight: 600;
+}
+.venue-info-row {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.venue-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px; font-family: var(--mono);
+  color: var(--text2);
+}
+.venue-chip span { color: var(--accent2); font-weight: 600; }
+
+/* MAIN LAYOUT */
+.main-grid {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 20px;
+}
+@media (max-width: 1100px) { .main-grid { grid-template-columns: 1fr; } }
+
+/* STAGE VISUAL */
+.stage-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+#stage-svg-wrap { border-radius: 10px; overflow: hidden; background: var(--bg3); }
+
+/* EQUIPMENT QUANTITY CONTROLS */
+.equip-grid { display: flex; flex-direction: column; gap: 8px; }
+.equip-row {
+  display: flex; align-items: center;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  gap: 10px;
+}
+.equip-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+.equip-info { flex: 1; min-width: 0; }
+.equip-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.equip-spec { font-size: 10px; font-family: var(--mono); color: var(--text3); margin-top: 1px; }
+.qty-ctrl { display: flex; align-items: center; gap: 6px; }
+.qty-btn {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: var(--bg4);
+  color: var(--text);
+  font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.qty-btn:hover { background: var(--accent); border-color: var(--accent); }
+.qty-val {
+  width: 32px; text-align: center;
+  font-size: 14px; font-weight: 700;
+  font-family: var(--mono); color: var(--accent2);
+}
+
+/* RIGHT PANEL */
+.right-panel { display: flex; flex-direction: column; gap: 16px; }
+
+/* RESULT CARDS ROW */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) { .metrics-row { grid-template-columns: repeat(2, 1fr); } }
+
+.metric-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.metric-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: 14px 14px 0 0;
+}
+.metric-card.blue::before { background: linear-gradient(90deg, var(--accent), var(--purple)); }
+.metric-card.green::before { background: linear-gradient(90deg, var(--green), var(--cyan)); }
+.metric-card.amber::before { background: linear-gradient(90deg, var(--amber), #f97316); }
+.metric-card.red::before { background: linear-gradient(90deg, var(--red), var(--purple)); }
+.metric-card.green.warn { border-color: rgba(239,68,68,0.35); }
+.metric-card.green.warn::before { background: linear-gradient(90deg, var(--red), var(--amber)); }
+
+.metric-label { font-size: 10px; font-family: var(--mono); color: var(--text3); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.metric-value { font-size: 26px; font-weight: 700; font-family: var(--mono); line-height: 1; }
+.metric-unit { font-size: 13px; font-weight: 400; color: var(--text2); margin-left: 3px; }
+.metric-sub { font-size: 11px; color: var(--text2); margin-top: 5px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; font-family: var(--mono);
+  margin-top: 5px;
+}
+.badge.safe { background: rgba(16,185,129,0.15); color: var(--green2); border: 1px solid rgba(16,185,129,0.2); }
+.badge.warn { background: rgba(239,68,68,0.15); color: var(--red2); border: 1px solid rgba(239,68,68,0.2); }
+.badge.info { background: rgba(59,130,246,0.15); color: var(--accent2); border: 1px solid rgba(59,130,246,0.2); }
+
+/* 3-PHASE PANEL */
+.phase-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+.phase-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+.phase-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+.phase-label {
+  font-size: 10px; font-family: var(--mono);
+  letter-spacing: 1.5px; margin-bottom: 10px;
+  font-weight: 700;
+}
+.phase-R { color: #f87171; }
+.phase-S { color: #34d399; }
+.phase-T { color: #60a5fa; }
+.phase-bar-wrap { background: var(--bg4); border-radius: 4px; height: 6px; margin: 6px 0; overflow: hidden; }
+.phase-bar { height: 100%; border-radius: 4px; transition: width .4s ease; }
+.bar-R { background: linear-gradient(90deg,#ef4444,#f87171); }
+.bar-S { background: linear-gradient(90deg,#10b981,#34d399); }
+.bar-T { background: linear-gradient(90deg,#3b82f6,#60a5fa); }
+.phase-current { font-size: 22px; font-weight: 700; font-family: var(--mono); margin-bottom: 2px; }
+.phase-devices { font-size: 10px; color: var(--text3); font-family: var(--mono); line-height: 1.5; margin-top: 6px; }
+
+.breaker-box {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex; align-items: center; gap: 12px;
+}
+.breaker-icon { font-size: 24px; }
+.breaker-text { font-size: 13px; color: var(--text); }
+.breaker-val { font-size: 18px; font-weight: 700; font-family: var(--mono); color: var(--amber2); }
+
+/* ANALYSIS PANEL */
+.analysis-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+.analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.analysis-block {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.ab-label { font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.ab-val { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+.ab-sub { font-size: 11px; color: var(--text2); margin-top: 4px; }
+.warn-box {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(239,68,68,0.07);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 8px;
+  font-size: 11px; color: var(--red2);
+  display: none;
+}
+.warn-box.show { display: block; }
+
+/* INFRASTRUCTURE CONTROLS */
+.infra-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+.infra-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+@media (max-width: 700px) { .infra-grid { grid-template-columns: 1fr 1fr; } }
+
+.infra-item label {
+  font-size: 10px; font-family: var(--mono); color: var(--text3);
+  letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 5px;
+}
+.infra-item input, .infra-item select {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13px; font-family: var(--mono);
+  outline: none; transition: border-color .2s;
+  -webkit-appearance: none;
+}
+.infra-item input:focus, .infra-item select:focus { border-color: var(--accent); }
+.infra-item select option { background: var(--bg3); }
+
+/* POWER TABLE */
+.power-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+.power-table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+.power-table th {
+  font-size: 10px; font-family: var(--mono); color: var(--text3);
+  text-transform: uppercase; letter-spacing: 1px;
+  padding: 6px 12px; text-align: left;
+  border-bottom: 1px solid var(--border2);
+}
+.power-table td {
+  font-size: 12px; font-family: var(--mono);
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.power-table tr:last-child td { border-bottom: none; }
+.power-table tr:hover td { background: rgba(255,255,255,0.02); }
+.power-table .num { color: var(--accent2); font-weight: 600; text-align: right; }
+.power-table .total td { border-top: 1px solid var(--border2); color: var(--amber2); font-weight: 700; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+/* TRANSITIONS */
+.num-animate { transition: all .3s ease; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <div class="logo-box">⚡</div>
+    <div class="header-title">
+      <h1>FOH 무대 전력 인프라 최적화 시뮬레이터</h1>
+      <p>POWER_INFRASTRUCTURE_SIM v2.4.1 · REAL-TIME ANALYSIS ENGINE</p>
+    </div>
+  </div>
+  <div class="status-pill">
+    <div class="status-dot"></div>
+    LIVE COMPUTE
+  </div>
+</header>
+
+<!-- VENUE SELECTOR -->
+<div class="venue-section">
+  <div class="section-label">공연장 규모 선택</div>
+  <div class="venue-tabs">
+    <button class="venue-tab" onclick="setVenue('small')">🎵 소규모 (클럽/강당)</button>
+    <button class="venue-tab active" onclick="setVenue('medium')">🎭 중규모 (아트홀/극장)</button>
+    <button class="venue-tab" onclick="setVenue('large')">🏟️ 대규모 (체육관/페스티벌)</button>
+    <button class="venue-tab" onclick="setVenue('custom')">🔧 커스텀</button>
+  </div>
+  <div class="venue-info-row" id="venue-chips">
+    <div class="venue-chip">수용인원 <span id="vc-cap">300~2,000명</span></div>
+    <div class="venue-chip">무대 면적 <span id="vc-area">100~400㎡</span></div>
+    <div class="venue-chip">SPL 목표 <span id="vc-spl">100~105 dB</span></div>
+    <div class="venue-chip">추천 총전력 <span id="vc-pwr">~11 kW</span></div>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="main-grid">
+
+  <!-- LEFT: STAGE VISUAL + EQUIPMENT -->
+  <div class="stage-panel">
+    <div class="section-label">무대 배치 시뮬레이터</div>
+    <div id="stage-svg-wrap">
+      <!-- Stage SVG inserted by JS -->
+    </div>
+
+    <div class="section-label" style="margin-top:4px">장비 수량 조정</div>
+    <div class="equip-grid">
+      <div class="equip-row">
+        <div class="equip-icon">🔊</div>
+        <div class="equip-info">
+          <div class="equip-name">메인 앰프</div>
+          <div class="equip-spec">1,600W · cosθ 0.95 · 라인 어레이</div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('amp', -1)">−</button>
+          <div class="qty-val" id="qty-amp">2</div>
+          <button class="qty-btn" onclick="changeQty('amp', 1)">+</button>
+        </div>
+      </div>
+      <div class="equip-row">
+        <div class="equip-icon">💥</div>
+        <div class="equip-info">
+          <div class="equip-name">서브우퍼</div>
+          <div class="equip-spec">1,200W · cosθ 0.90 · 듀얼 18"</div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('sub', -1)">−</button>
+          <div class="qty-val" id="qty-sub">4</div>
+          <button class="qty-btn" onclick="changeQty('sub', 1)">+</button>
+        </div>
+      </div>
+      <div class="equip-row">
+        <div class="equip-icon">🎛️</div>
+        <div class="equip-info">
+          <div class="equip-name">디지털 콘솔</div>
+          <div class="equip-spec">170W · cosθ 0.90 · FOH 믹서</div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('console', -1)">−</button>
+          <div class="qty-val" id="qty-console">1</div>
+          <button class="qty-btn" onclick="changeQty('console', 1)">+</button>
+        </div>
+      </div>
+      <div class="equip-row">
+        <div class="equip-icon">💡</div>
+        <div class="equip-info">
+          <div class="equip-name">무대 조명 (LED)</div>
+          <div class="equip-spec">260W · cosθ 0.98 · 무빙헤드</div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('light', -1)">−</button>
+          <div class="qty-val" id="qty-light">12</div>
+          <button class="qty-btn" onclick="changeQty('light', 1)">+</button>
+        </div>
+      </div>
+      <div class="equip-row">
+        <div class="equip-icon">📢</div>
+        <div class="equip-info">
+          <div class="equip-name">패시브 스피커</div>
+          <div class="equip-spec">8Ω · 병렬 연결 검증</div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('spk', -1)">−</button>
+          <div class="qty-val" id="qty-spk">3</div>
+          <button class="qty-btn" onclick="changeQty('spk', 1)">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <!-- TOP METRICS -->
+    <div class="metrics-row">
+      <div class="metric-card blue">
+        <div class="metric-label">총 소비전력</div>
+        <div class="metric-value"><span id="m-total-kw" class="num-animate">11.29</span><span class="metric-unit">kWh</span></div>
+        <div class="metric-sub">실제 예상: <span id="m-actual-kw" style="color:var(--accent2);font-weight:600">6.47</span> kWh</div>
+      </div>
+      <div class="metric-card green" id="card-vd">
+        <div class="metric-label">전압 강하율</div>
+        <div class="metric-value"><span id="m-vdrop-pct" class="num-animate">4.38</span><span class="metric-unit">%</span></div>
+        <div><span class="badge warn" id="vd-badge">⚠ WARNING</span></div>
+      </div>
+      <div class="metric-card amber" id="card-imp">
+        <div class="metric-label">스피커 임피던스</div>
+        <div class="metric-value"><span id="m-impedance" class="num-animate">2.67</span><span class="metric-unit">Ω</span></div>
+        <div><span class="badge safe" id="imp-badge">✓ PASS</span></div>
+      </div>
+      <div class="metric-card red">
+        <div class="metric-label">최대 상 전류</div>
+        <div class="metric-value"><span id="m-max-phase" class="num-animate">18.52</span><span class="metric-unit">A</span></div>
+        <div class="metric-sub">추천 차단기: <span id="m-breaker" style="color:var(--amber2);font-weight:700">30A</span></div>
+      </div>
+    </div>
+
+    <!-- 3-PHASE PANEL -->
+    <div class="phase-panel">
+      <div class="section-label">Step 1 · 3상 전력 분배 (상 평형 분석)</div>
+      <div class="phase-grid">
+        <div class="phase-card">
+          <div class="phase-label phase-R">R상 (L1)</div>
+          <div class="phase-current phase-R" id="ph-R">18.52<span style="font-size:13px;font-weight:400;color:var(--text2)"> A</span></div>
+          <div class="phase-bar-wrap"><div class="phase-bar bar-R" id="bar-R" style="width:80%"></div></div>
+          <div class="phase-devices" id="dev-R">앰프 1 + 서브 1 + 조명 4</div>
+        </div>
+        <div class="phase-card">
+          <div class="phase-label phase-S">S상 (L2)</div>
+          <div class="phase-current phase-S" id="ph-S">18.52<span style="font-size:13px;font-weight:400;color:var(--text2)"> A</span></div>
+          <div class="phase-bar-wrap"><div class="phase-bar bar-S" id="bar-S" style="width:80%"></div></div>
+          <div class="phase-devices" id="dev-S">앰프 1 + 서브 1 + 조명 4</div>
+        </div>
+        <div class="phase-card">
+          <div class="phase-label phase-T">T상 (L3)</div>
+          <div class="phase-current phase-T" id="ph-T">17.77<span style="font-size:13px;font-weight:400;color:var(--text2)"> A</span></div>
+          <div class="phase-bar-wrap"><div class="phase-bar bar-T" id="bar-T" style="width:77%"></div></div>
+          <div class="phase-devices" id="dev-T">서브 2 + 콘솔 1 + 조명 4</div>
+        </div>
+      </div>
+      <div class="breaker-box">
+        <div class="breaker-icon">🔌</div>
+        <div style="flex:1">
+          <div class="breaker-text">메인 차단기 추천 용량 (최대 상 전류 × 1.25배 이상)</div>
+          <div style="margin-top:2px;font-size:11px;color:var(--text3);font-family:var(--mono)" id="breaker-formula">18.52A × 1.25 = 23.15A → 30A 규격 적용</div>
+        </div>
+        <div class="breaker-val" id="breaker-val">30A</div>
+      </div>
+      <div style="margin-top:10px;padding:10px 14px;background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.15);border-radius:8px;font-size:11px;color:var(--amber2)" id="imbalance-warn" style="display:none"></div>
+    </div>
+
+    <!-- ANALYSIS ROW -->
+    <div class="analysis-panel">
+      <div class="section-label">Step 2 · 전압 강하 분석 &nbsp;|&nbsp; Step 3 · 임피던스 매칭</div>
+      <div class="analysis-grid">
+        <div class="analysis-block">
+          <div class="ab-label">케이블 왕복 저항 (R_line)</div>
+          <div class="ab-val" id="a-rline">0.52 <span style="font-size:13px;font-weight:400;color:var(--text2)">Ω</span></div>
+          <div class="ab-sub">2 × <span id="a-dist">50</span>m × <span id="a-rperM">0.0052</span> Ω/m</div>
+        </div>
+        <div class="analysis-block">
+          <div class="ab-label">전압 강하량 (ΔV)</div>
+          <div class="ab-val" id="a-dv">9.63 <span style="font-size:13px;font-weight:400;color:var(--text2)">V</span></div>
+          <div class="ab-sub"><span id="a-Imax">18.52</span>A × <span id="a-rline2">0.52</span>Ω</div>
+        </div>
+        <div class="analysis-block">
+          <div class="ab-label">병렬 임피던스 (Z_total)</div>
+          <div class="ab-val" id="a-ztot">2.67 <span style="font-size:13px;font-weight:400;color:var(--text2)">Ω</span></div>
+          <div class="ab-sub">8Ω ÷ <span id="a-nspk">3</span>대 = <span id="a-ztot2">2.67</span>Ω &nbsp;<span id="a-imp-badge" style="font-size:10px;color:var(--green2)">≥ 2Ω ✓</span></div>
+        </div>
+        <div class="analysis-block">
+          <div class="ab-label">앰프 최소 허용 임피던스</div>
+          <div class="ab-val">2.00 <span style="font-size:13px;font-weight:400;color:var(--text2)">Ω</span></div>
+          <div class="ab-sub">Z_amp 기준값 (고정)</div>
+        </div>
+      </div>
+      <div class="warn-box" id="vd-warn-box">
+        ⚠ 전압 강하율이 3.0%를 초과했습니다. 케이블을 <strong>10 AWG (0.0033 Ω/m)</strong>로 상향하거나 송전 거리를 줄이십시오.
+      </div>
+      <div class="warn-box" id="imp-warn-box" style="border-color:rgba(239,68,68,0.4)">
+        🔴 임피던스가 앰프 최소 허용값 미만입니다. <strong>앰프 파손 위험!</strong> 스피커 수량을 줄이거나 직렬-병렬 혼합 구성으로 변경하십시오.
+      </div>
+    </div>
+
+    <!-- INFRASTRUCTURE -->
+    <div class="infra-panel">
+      <div class="section-label">Step 4 · 인프라 설정</div>
+      <div class="infra-grid">
+        <div class="infra-item">
+          <label>송전 거리 (m)</label>
+          <input type="number" id="inp-dist" value="50" min="1" max="500" oninput="calc()">
+        </div>
+        <div class="infra-item">
+          <label>케이블 규격</label>
+          <select id="inp-cable" onchange="calc()">
+            <option value="0.0052">12 AWG (0.0052 Ω/m)</option>
+            <option value="0.0033">10 AWG (0.0033 Ω/m)</option>
+            <option value="0.0021">8 AWG (0.0021 Ω/m)</option>
+            <option value="0.0013">6 AWG (0.0013 Ω/m)</option>
+          </select>
+        </div>
+        <div class="infra-item">
+          <label>스피커 임피던스 (Ω)</label>
+          <input type="number" id="inp-spk-imp" value="8" min="2" max="16" oninput="calc()">
+        </div>
+        <div class="infra-item">
+          <label>공급 전압 (V)</label>
+          <input type="number" id="inp-volt" value="220" min="100" max="240" oninput="calc()">
+        </div>
+        <div class="infra-item">
+          <label>앰프 최소 임피던스 (Ω)</label>
+          <input type="number" id="inp-zamp" value="2" min="1" max="8" oninput="calc()">
+        </div>
+        <div class="infra-item">
+          <label>음향 부하율 (%)</label>
+          <input type="number" id="inp-audio-load" value="33" min="10" max="100" oninput="calc()">
+        </div>
+      </div>
+    </div>
+
+    <!-- POWER TABLE -->
+    <div class="power-panel">
+      <div class="section-label">Step 4 · 장비별 전력 소비 분석</div>
+      <table class="power-table">
+        <thead>
+          <tr>
+            <th>장비</th><th>수량</th><th>P (W)</th><th>S (VA)</th>
+            <th style="text-align:right">총 P (W)</th><th style="text-align:right">I (A/대)</th>
+          </tr>
+        </thead>
+        <tbody id="power-tbody"></tbody>
+        <tfoot>
+          <tr class="total">
+            <td colspan="4">합계 (정격)</td>
+            <td class="num" id="tf-total-w">—</td>
+            <td class="num" id="tf-total-i">—</td>
+          </tr>
+          <tr class="total">
+            <td colspan="4" style="color:var(--green2)">실제 예상 (부하율 반영)</td>
+            <td class="num" style="color:var(--green2)" id="tf-actual-w">—</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+  </div><!-- /right-panel -->
+</div><!-- /main-grid -->
+
+</div><!-- /wrap -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+const EQUIP = {
+  amp:     { name:'메인 앰프',     icon:'🔊', P:1600, cosTheta:0.95, qty:2, audioLoad:true  },
+  sub:     { name:'서브우퍼',      icon:'💥', P:1200, cosTheta:0.90, qty:4, audioLoad:true  },
+  console: { name:'디지털 콘솔',   icon:'🎛️', P:170,  cosTheta:0.90, qty:1, audioLoad:false },
+  light:   { name:'무대 조명 LED', icon:'💡', P:260,  cosTheta:0.98, qty:12,audioLoad:false },
+};
+const VENUE = {
+  small:  { cap:'~300명',       area:'~50㎡',    spl:'95~100 dB', label:'소규모', amp:2,  sub:2,  console:1, light:6,  spk:2 },
+  medium: { cap:'300~2,000명',  area:'100~400㎡', spl:'100~105 dB',label:'중규모', amp:2,  sub:4,  console:1, light:12, spk:3 },
+  large:  { cap:'2,000명~',     area:'400㎡~',   spl:'105~115 dB',label:'대규모', amp:6,  sub:12, console:2, light:36, spk:6 },
+  custom: { cap:'—',            area:'—',        spl:'—',         label:'커스텀', amp:null,sub:null,console:null,light:null,spk:null },
+};
+let currentVenue = 'medium';
+let qty = { amp:2, sub:4, console:1, light:12, spk:3 };
+
+// ── Venue ──────────────────────────────────────────────────────────
+function setVenue(v) {
+  currentVenue = v;
+  document.querySelectorAll('.venue-tab').forEach((t,i)=>{
+    t.classList.toggle('active', ['small','medium','large','custom'][i]===v);
+  });
+  const info = VENUE[v];
+  document.getElementById('vc-cap').textContent  = info.cap;
+  document.getElementById('vc-area').textContent = info.area;
+  document.getElementById('vc-spl').textContent  = info.spl;
+  if(info.amp !== null) {
+    qty.amp=info.amp; qty.sub=info.sub; qty.console=info.console;
+    qty.light=info.light; qty.spk=info.spk;
+    ['amp','sub','console','light','spk'].forEach(k=>{
+      document.getElementById('qty-'+k).textContent = qty[k];
+    });
+  }
+  calc();
+}
+
+// ── Qty Controls ───────────────────────────────────────────────────
+function changeQty(k, d) {
+  const min = (k==='console')?1:0;
+  qty[k] = Math.max(min, qty[k]+d);
+  document.getElementById('qty-'+k).textContent = qty[k];
+  // Switch to custom if user modifies
+  if(currentVenue!=='custom') {
+    document.querySelectorAll('.venue-tab').forEach((t,i)=>{
+      t.classList.toggle('active', i===3);
+    });
+    currentVenue='custom';
+  }
+  calc();
+}
+
+// ── Core Calculation ───────────────────────────────────────────────
+function calc() {
+  const dist   = parseFloat(document.getElementById('inp-dist').value)||50;
+  const rPerM  = parseFloat(document.getElementById('inp-cable').value)||0.0052;
+  const spkImp = parseFloat(document.getElementById('inp-spk-imp').value)||8;
+  const volt   = parseFloat(document.getElementById('inp-volt').value)||220;
+  const Zamp   = parseFloat(document.getElementById('inp-zamp').value)||2;
+  const audioLoad = parseFloat(document.getElementById('inp-audio-load').value)||33;
+
+  // --- Per-device calcs ---
+  const devs = {
+    amp:     { P: EQUIP.amp.P,     cosT: EQUIP.amp.cosTheta,     n: qty.amp,     audioLoad: true },
+    sub:     { P: EQUIP.sub.P,     cosT: EQUIP.sub.cosTheta,     n: qty.sub,     audioLoad: true },
+    console: { P: EQUIP.console.P, cosT: EQUIP.console.cosTheta, n: qty.console, audioLoad: false},
+    light:   { P: EQUIP.light.P,   cosT: EQUIP.light.cosTheta,   n: qty.light,   audioLoad: false},
+  };
+  Object.values(devs).forEach(d => {
+    d.S  = d.P / d.cosT;           // VA per unit
+    d.I  = d.S / volt;             // A per unit
+    d.Pn = d.P * d.n;              // total W
+    d.In = d.I * d.n;              // total A
+    d.loadFactor = d.audioLoad ? audioLoad/100 : 0.90;
+    d.Pactual = d.Pn * d.loadFactor;
+  });
+
+  // --- Step 1: 3-phase distribution ---
+  // Distribute as balanced as possible
+  const ampI   = devs.amp.I;
+  const subI   = devs.sub.I;
+  const conI   = devs.console.I;
+  const lgtI   = devs.light.I;
+  const nAmp   = qty.amp;
+  const nSub   = qty.sub;
+  const nLight = qty.light;
+  const nCon   = qty.console;
+
+  // Smart distribution algorithm
+  // R: amps first, then subs, then lights
+  // S: remaining amps, subs, lights
+  // T: remaining subs, console, lights
+  const halfAmp   = Math.floor(nAmp/2);
+  const remAmp    = nAmp - halfAmp;
+  const halfSub   = Math.floor(nSub/2);
+  const remSub    = nSub - halfSub;
+  const thirdLight = Math.floor(nLight/3);
+  const remLight   = nLight - thirdLight*2;
+
+  const IR = halfAmp*ampI + Math.floor(nSub/4)*subI + thirdLight*lgtI;
+  const IS = remAmp*ampI  + Math.floor(nSub/4)*subI + thirdLight*lgtI;
+  const IT = Math.ceil(nSub/2)*subI + nCon*conI + remLight*lgtI;
+
+  // Recalc labels
+  const rDesc = `앰프 ${halfAmp} + 서브 ${Math.floor(nSub/4)} + 조명 ${thirdLight}`;
+  const sDesc = `앰프 ${remAmp} + 서브 ${Math.floor(nSub/4)} + 조명 ${thirdLight}`;
+  const tDesc = `서브 ${Math.ceil(nSub/2)} + 콘솔 ${nCon} + 조명 ${remLight}`;
+
+  const Imax = Math.max(IR, IS, IT);
+  const breakerRaw = Imax * 1.25;
+  const breaker = breakerRaw<=30?30 : breakerRaw<=60?60 : breakerRaw<=100?100 : Math.ceil(breakerRaw/25)*25;
+  const maxBar = Math.max(IR,IS,IT,1);
+
+  // --- Step 2: Voltage drop ---
+  const Rline = 2 * dist * rPerM;
+  const dV    = Imax * Rline;
+  const vdPct = (dV / volt) * 100;
+
+  // --- Step 3: Impedance matching ---
+  const Ztot = qty.spk>0 ? spkImp / qty.spk : Infinity;
+
+  // --- Step 4: Power totals ---
+  const totalW  = devs.amp.Pn + devs.sub.Pn + devs.console.Pn + devs.light.Pn;
+  const actualW = devs.amp.Pactual + devs.sub.Pactual + devs.console.Pactual + devs.light.Pactual;
+  const estPwr  = (actualW/1000).toFixed(2) + ' kWh';
+
+  // ── Update DOM ─────────────────────────────────────────────────
+  // Metrics
+  document.getElementById('m-total-kw').textContent   = (totalW/1000).toFixed(2);
+  document.getElementById('m-actual-kw').textContent  = (actualW/1000).toFixed(2);
+  document.getElementById('vc-pwr').textContent       = '~' + (totalW/1000).toFixed(1) + ' kW';
+  document.getElementById('m-vdrop-pct').textContent  = vdPct.toFixed(2);
+  document.getElementById('m-impedance').textContent  = qty.spk>0 ? Ztot.toFixed(2) : '∞';
+  document.getElementById('m-max-phase').textContent  = Imax.toFixed(2);
+  document.getElementById('m-breaker').textContent    = breaker + 'A';
+
+  // VD badge
+  const vdBad = document.getElementById('vd-badge');
+  const vdCard = document.getElementById('card-vd');
+  if(vdPct > 3.0) {
+    vdBad.className = 'badge warn'; vdBad.textContent = '⚠ WARNING';
+    vdCard.classList.add('warn');
+    document.getElementById('vd-warn-box').classList.add('show');
+  } else {
+    vdBad.className = 'badge safe'; vdBad.textContent = '✓ SAFE';
+    vdCard.classList.remove('warn');
+    document.getElementById('vd-warn-box').classList.remove('show');
+  }
+
+  // Impedance badge
+  const impBad = document.getElementById('imp-badge');
+  const impCard = document.getElementById('card-imp');
+  const aImpBadge = document.getElementById('a-imp-badge');
+  if(qty.spk>0 && Ztot < Zamp) {
+    impBad.className = 'badge warn'; impBad.textContent = '✗ FAIL';
+    impCard.querySelector('::before'); // trigger
+    impCard.style.borderColor = 'rgba(239,68,68,0.35)';
+    aImpBadge.style.color = 'var(--red2)';
+    aImpBadge.textContent = '< ' + Zamp + 'Ω ✗';
+    document.getElementById('imp-warn-box').classList.add('show');
+  } else {
+    impBad.className = 'badge safe'; impBad.textContent = '✓ PASS';
+    impCard.style.borderColor = '';
+    aImpBadge.style.color = 'var(--green2)';
+    aImpBadge.textContent = '≥ ' + Zamp + 'Ω ✓';
+    document.getElementById('imp-warn-box').classList.remove('show');
+  }
+
+  // Phase
+  document.getElementById('ph-R').innerHTML = IR.toFixed(2) + '<span style="font-size:13px;font-weight:400;color:var(--text2)"> A</span>';
+  document.getElementById('ph-S').innerHTML = IS.toFixed(2) + '<span style="font-size:13px;font-weight:400;color:var(--text2)"> A</span>';
+  document.getElementById('ph-T').innerHTML = IT.toFixed(2) + '<span style="font-size:13px;font-weight:400;color:var(--text2)"> A</span>';
+  document.getElementById('bar-R').style.width = Math.min(100,(IR/maxBar)*100)+'%';
+  document.getElementById('bar-S').style.width = Math.min(100,(IS/maxBar)*100)+'%';
+  document.getElementById('bar-T').style.width = Math.min(100,(IT/maxBar)*100)+'%';
+  document.getElementById('dev-R').textContent = rDesc;
+  document.getElementById('dev-S').textContent = sDesc;
+  document.getElementById('dev-T').textContent = tDesc;
+
+  // Imbalance warning
+  const imbalBox = document.getElementById('imbalance-warn');
+  const imbal = (Math.max(IR,IS,IT)-Math.min(IR,IS,IT))/Math.max(IR,IS,IT,1)*100;
+  if(imbal > 15) {
+    imbalBox.style.display='block';
+    imbalBox.textContent = `⚡ 상 불평형율 ${imbal.toFixed(1)}% — 15% 초과 시 중성선 과부하 위험. 장비 분배를 재조정하십시오.`;
+  } else {
+    imbalBox.style.display='none';
+  }
+
+  // Breaker
+  document.getElementById('breaker-val').textContent = breaker + 'A';
+  document.getElementById('breaker-formula').textContent =
+    `${Imax.toFixed(2)}A × 1.25 = ${(Imax*1.25).toFixed(2)}A → ${breaker}A 규격 적용`;
+  document.getElementById('m-breaker').textContent = breaker + 'A';
+
+  // Analysis
+  document.getElementById('a-rline').innerHTML  = Rline.toFixed(4) + ' <span style="font-size:13px;font-weight:400;color:var(--text2)">Ω</span>';
+  document.getElementById('a-dv').innerHTML     = dV.toFixed(2) + ' <span style="font-size:13px;font-weight:400;color:var(--text2)">V</span>';
+  document.getElementById('a-ztot').innerHTML   = (qty.spk>0?Ztot.toFixed(2):'∞') + ' <span style="font-size:13px;font-weight:400;color:var(--text2)">Ω</span>';
+  document.getElementById('a-dist').textContent  = dist;
+  document.getElementById('a-rperM').textContent = rPerM;
+  document.getElementById('a-Imax').textContent  = Imax.toFixed(2);
+  document.getElementById('a-rline2').textContent= Rline.toFixed(4);
+  document.getElementById('a-nspk').textContent  = qty.spk;
+  document.getElementById('a-ztot2').textContent = qty.spk>0?Ztot.toFixed(2):'∞';
+
+  // Power table
+  const tbody = document.getElementById('power-tbody');
+  const rows = [
+    ['메인 앰프', '🔊', EQUIP.amp.P, EQUIP.amp.cosTheta, qty.amp, devs.amp.I, devs.amp.audioLoad, audioLoad],
+    ['서브우퍼',  '💥', EQUIP.sub.P, EQUIP.sub.cosTheta, qty.sub, devs.sub.I, devs.sub.audioLoad, audioLoad],
+    ['디지털 콘솔','🎛️',EQUIP.console.P,EQUIP.console.cosTheta,qty.console,devs.console.I,false,90],
+    ['무대 조명', '💡', EQUIP.light.P,EQUIP.light.cosTheta,qty.light, devs.light.I, false, 90],
+  ];
+  tbody.innerHTML = rows.map(([name,icon,P,cosT,n,I,isAudio,load])=>{
+    const S   = (P/cosT).toFixed(0);
+    const Pn  = (P*n).toLocaleString();
+    const In  = I.toFixed(3);
+    const lf  = isAudio ? audioLoad : 90;
+    return `<tr>
+      <td>${icon} ${name} <span style="color:var(--text3);font-size:10px">(부하율 ${lf}%)</span></td>
+      <td class="num">${n}대</td>
+      <td class="num">${P.toLocaleString()}</td>
+      <td class="num">${S}</td>
+      <td class="num">${Pn}</td>
+      <td class="num">${In}</td>
+    </tr>`;
+  }).join('');
+
+  const totalI = (devs.amp.In + devs.sub.In + devs.console.In + devs.light.In).toFixed(3);
+  document.getElementById('tf-total-w').textContent  = totalW.toLocaleString() + ' W';
+  document.getElementById('tf-total-i').textContent  = totalI + ' A';
+  document.getElementById('tf-actual-w').textContent = actualW.toFixed(0) + ' W (' + (actualW/1000).toFixed(2) + ' kWh)';
+
+  // Stage SVG
+  drawStage();
+}
+
+// ── Stage SVG ──────────────────────────────────────────────────────
+function drawStage() {
+  const n = qty;
+  const W = 380, H = 320;
+
+  // Colors
+  const clrAmp   = '#3b82f6';
+  const clrSub   = '#8b5cf6';
+  const clrLight = '#f59e0b';
+  const clrCons  = '#10b981';
+  const clrSpk   = '#06b6d4';
+
+  // Stage base
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" width="100%" style="display:block">
+  <defs>
+    <filter id="glow-a"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-l"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <!-- BG -->
+  <rect width="${W}" height="${H}" fill="#0d1117" rx="10"/>
+  <!-- Floor grid -->
+  ${Array.from({length:12},(_,i)=>`<line x1="${30+i*28}" y1="220" x2="${30+i*28}" y2="${H-10}" stroke="#1e2a3a" stroke-width="0.5"/>`).join('')}
+  <!-- Audience area -->
+  <rect x="20" y="240" width="${W-40}" height="60" rx="4" fill="#0f1923" stroke="#1e2a3a" stroke-width="1"/>
+  <text x="${W/2}" y="275" text-anchor="middle" fill="#2a3a50" font-size="10" font-family="monospace">AUDIENCE AREA</text>
+  <!-- Stage platform -->
+  <rect x="40" y="130" width="${W-80}" height="100" rx="4" fill="#111825" stroke="#1e3050" stroke-width="1.5"/>
+  <rect x="40" y="225" width="${W-80}" height="8" rx="2" fill="#1a2535"/>
+  <text x="${W/2}" y="195" text-anchor="middle" fill="#1e3a5a" font-size="11" font-family="monospace" letter-spacing="3">S T A G E</text>
+  <!-- Truss bar -->
+  <rect x="30" y="60" width="${W-60}" height="8" rx="3" fill="#1a2030" stroke="#2a3550" stroke-width="1"/>
+  <rect x="30" y="62" width="${W-60}" height="4" rx="2" fill="#232d45"/>
+  ${Array.from({length:10},(_,i)=>`<line x1="${50+i*30}" y1="68" x2="${50+i*30}" y2="130" stroke="#1a2535" stroke-width="0.7" stroke-dasharray="3,4"/>`).join('')}
+  `;
+
+  // ── Lights on truss ─────────────────────────────────────────────
+  const numLights = Math.min(n.light, 16);
+  const lSpacing  = (W-80)/(numLights+1);
+  for(let i=0;i<numLights;i++){
+    const lx = 40 + lSpacing*(i+1);
+    const active = i < numLights;
+    svg += `
+    <g filter="url(#glow-l)" opacity="${active?1:0.3}">
+      <polygon points="${lx},70 ${lx-7},80 ${lx+7},80" fill="${clrLight}" opacity="0.9"/>
+      <polygon points="${lx},82 ${lx-10},110 ${lx+10},110" fill="${clrLight}" opacity="${0.05+Math.random()*0.05}"/>
+      <ellipse cx="${lx}" cy="115" rx="8" ry="3" fill="${clrLight}" opacity="0.12"/>
+    </g>`;
+  }
+  if(n.light > 16) svg += `<text x="${W/2}" y="118" text-anchor="middle" fill="${clrLight}" font-size="9" font-family="monospace">+${n.light-16}대 추가</text>`;
+
+  // ── Main amps (L/R speaker stacks) ──────────────────────────────
+  const ampW = 22, ampH = 32;
+  const numAmpSide = Math.ceil(n.amp/2);
+  for(let i=0;i<numAmpSide;i++){
+    // Left stack
+    const ly = 135 + i*(ampH+4);
+    svg += `<rect x="44" y="${ly}" width="${ampW}" height="${ampH}" rx="3" fill="#0d1d3a" stroke="${clrAmp}" stroke-width="1.2"/>
+    <rect x="46" y="${ly+4}" width="${ampW-4}" height="8" rx="2" fill="${clrAmp}" opacity="0.8"/>
+    <circle cx="55" cy="${ly+ampH-7}" r="2.5" fill="${clrAmp}" opacity="0.6"/>`;
+    // Right stack
+    svg += `<rect x="${W-44-ampW}" y="${ly}" width="${ampW}" height="${ampH}" rx="3" fill="#0d1d3a" stroke="${clrAmp}" stroke-width="1.2"/>
+    <rect x="${W-44-ampW+2}" y="${ly+4}" width="${ampW-4}" height="8" rx="2" fill="${clrAmp}" opacity="0.8"/>
+    <circle cx="${W-44-ampW/2}" cy="${ly+ampH-7}" r="2.5" fill="${clrAmp}" opacity="0.6"/>`;
+  }
+  if(n.amp>0){
+    svg += `<text x="56" y="223" text-anchor="middle" fill="${clrAmp}" font-size="8" font-family="monospace">PA×${Math.ceil(n.amp/2)}</text>`;
+    svg += `<text x="${W-56}" y="223" text-anchor="middle" fill="${clrAmp}" font-size="8" font-family="monospace">PA×${Math.floor(n.amp/2)}</text>`;
+  }
+
+  // ── Subs (across stage front) ───────────────────────────────────
+  const numSubs = Math.min(n.sub, 8);
+  const subW = Math.min(32, (W-120)/numSubs - 4);
+  const subTotalW = numSubs*(subW+4)-4;
+  const subStartX = (W-subTotalW)/2;
+  for(let i=0;i<numSubs;i++){
+    const sx = subStartX + i*(subW+4);
+    svg += `<rect x="${sx}" y="195" width="${subW}" height="30" rx="3" fill="#100a20" stroke="${clrSub}" stroke-width="1.2"/>
+    <rect x="${sx+3}" y="200" width="${subW-6}" height="14" rx="2" fill="${clrSub}" opacity="0.25"/>
+    <circle cx="${sx+subW/2}" cy="219" r="3" fill="${clrSub}" opacity="0.5"/>`;
+  }
+  if(n.sub>8) svg += `<text x="${W/2}" y="192" text-anchor="middle" fill="${clrSub}" font-size="8" font-family="monospace">서브우퍼 ×${n.sub}</text>`;
+  else if(n.sub>0) svg += `<text x="${W/2}" y="192" text-anchor="middle" fill="${clrSub}" font-size="8" font-family="monospace">SUBWOOFER ×${n.sub}</text>`;
+
+  // ── Console (FOH position, in front of audience) ─────────────────
+  svg += `
+  <rect x="${W/2-22}" y="246" width="44" height="24" rx="4" fill="#0a1a14" stroke="${clrCons}" stroke-width="1.2"/>
+  <rect x="${W/2-18}" y="250" width="36" height="8" rx="2" fill="${clrCons}" opacity="0.5"/>
+  <circle cx="${W/2-8}" cy="261" r="1.5" fill="${clrCons}" opacity="0.8"/>
+  <circle cx="${W/2}" cy="261" r="1.5" fill="${clrCons}" opacity="0.8"/>
+  <circle cx="${W/2+8}" cy="261" r="1.5" fill="${clrCons}" opacity="0.8"/>
+  <text x="${W/2}" y="${H-8}" text-anchor="middle" fill="${clrCons}" font-size="8" font-family="monospace">FOH CONSOLE ×${n.console}</text>`;
+
+  // ── Speaker monitoring indicators ────────────────────────────────
+  const numSpkShow = Math.min(n.spk, 6);
+  const spkSpacing = (W-120)/Math.max(numSpkShow,1);
+  for(let i=0;i<numSpkShow;i++){
+    const sx2 = 60 + spkSpacing/2 + i*spkSpacing;
+    svg += `<rect x="${sx2-8}" y="138" width="16" height="20" rx="3" fill="#091418" stroke="${clrSpk}" stroke-width="1"/>
+    <circle cx="${sx2}" cy="149" r="4" fill="${clrSpk}" opacity="0.3"/>`;
+  }
+  if(n.spk>6) svg += `<text x="${W/2}" y="136" text-anchor="middle" fill="${clrSpk}" font-size="8" font-family="monospace">+${n.spk-6}대 추가</text>`;
+
+  // ── Legend ───────────────────────────────────────────────────────
+  const legend = [
+    [clrAmp,'메인 PA'], [clrSub,'서브우퍼'],
+    [clrLight,'조명'], [clrCons,'콘솔'], [clrSpk,'모니터']
+  ];
+  legend.forEach(([c,l],i)=>{
+    const lx = 20 + i*70;
+    svg += `<rect x="${lx}" y="${H-22}" width="8" height="8" rx="2" fill="${c}" opacity="0.7"/>
+    <text x="${lx+11}" y="${H-15}" fill="#4a5568" font-size="8.5" font-family="monospace">${l}</text>`;
+  });
+
+  svg += `</svg>`;
+  document.getElementById('stage-svg-wrap').innerHTML = svg;
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+calc();
+</script>
+</body>
+</html>
